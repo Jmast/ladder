@@ -232,7 +232,7 @@ for i in tqdm(range(i_iter, num_iter)):
     images, labels = mnist.train.next_batch(batch_size)
     sess.run(train_step, feed_dict={inputs: images, outputs: labels, training: True})
     if (i > 1) and ((i+1) % int(num_iter/num_epochs) == 0):
-        epoch_n = int(i/(num_examples/batch_size))
+        epoch_n = int(i/int(num_examples/batch_size))
         if (epoch_n+1) >= decay_after:
             # decay learning rate
             # learning_rate = starter_learning_rate * ((num_epochs - epoch_n) / (num_epochs - decay_after))
