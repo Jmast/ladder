@@ -19,7 +19,7 @@ starter_learning_rate = 0.02
 decay_after = 15  # epoch after which to begin learning rate decay
 
 batch_size = 100
-num_iter = (num_examples/batch_size) * num_epochs  # number of loop iterations
+num_iter = int(num_examples/batch_size) * num_epochs  # number of loop iterations
 
 inputs = tf.placeholder(tf.float32, shape=(None, layer_sizes[0]))
 outputs = tf.placeholder(tf.float32)
@@ -32,7 +32,7 @@ def bi(inits, size, name):
 def wi(shape, name):
     return tf.Variable(tf.random_normal(shape, name=name)) / math.sqrt(shape[0])
 
-shapes = zip(layer_sizes[:-1], layer_sizes[1:])  # shapes of linear layers
+shapes = list(zip(layer_sizes[:-1], layer_sizes[1:]))  # shapes of linear layers
 
 weights = {'W': [wi(s, "W") for s in shapes],  # Encoder weights
            'V': [wi(s[::-1], "V") for s in shapes],  # Decoder weights
@@ -85,7 +85,7 @@ def encoder(inputs, noise_std):
     d['unlabeled'] = {'z': {}, 'm': {}, 'v': {}, 'h': {}}
     d['labeled']['z'][0], d['unlabeled']['z'][0] = split_lu(h)
     for l in range(1, L+1):
-        print "Layer ", l, ": ", layer_sizes[l-1], " -> ", layer_sizes[l]
+        print("Layer ", l, ": ", layer_sizes[l-1], " -> ", layer_sizes[l])
         d['labeled']['h'][l-1], d['unlabeled']['h'][l-1] = split_lu(h)
         z_pre = tf.matmul(h, weights['W'][l-1])  # pre-activation
         z_pre_l, z_pre_u = split_lu(z_pre)  # split labeled and unlabeled examples
@@ -134,13 +134,13 @@ def encoder(inputs, noise_std):
     d['labeled']['h'][l], d['unlabeled']['h'][l] = split_lu(h)
     return h, d
 
-print "=== Corrupted Encoder ==="
+print("=== Corrupted Encoder ===")
 y_c, corr = encoder(inputs, noise_std)
 
-print "=== Clean Encoder ==="
+print("=== Clean Encoder ===")
 y, clean = encoder(inputs, 0.0)  # 0.0 -> do not add noise
 
-print "=== Decoder ==="
+print("=== Decoder ===")
 
 
 def g_gauss(z_c, u, size):
@@ -168,7 +168,7 @@ def g_gauss(z_c, u, size):
 z_est = {}
 d_cost = []  # to store the denoising cost of all layers
 for l in range(L, -1, -1):
-    print "Layer ", l, ": ", layer_sizes[l+1] if l+1 < len(layer_sizes) else None, " -> ", layer_sizes[l], ", denoising cost: ", denoising_cost[l]
+    print("Layer ", l, ": ", layer_sizes[l+1] if l+1 < len(layer_sizes) else None, " -> ", layer_sizes[l], ", denoising cost: ", denoising_cost[l])
     z, z_c = clean['unlabeled']['z'][l], corr['unlabeled']['z'][l]
     m, v = clean['unlabeled']['m'].get(l, 0), clean['unlabeled']['v'].get(l, 1-1e-10)
     if l == L:
@@ -201,12 +201,12 @@ bn_updates = tf.group(*bn_assigns)
 with tf.control_dependencies([train_step]):
     train_step = tf.group(bn_updates)
 
-print "===  Loading Data ==="
+print("===  Loading Data ===")
 mnist = input_data.read_data_sets("MNIST_data", n_labeled=num_labeled, one_hot=True)
 
 saver = tf.train.Saver()
 
-print "===  Starting Session ==="
+print("===  Starting Session ===")
 sess = tf.Session()
 
 i_iter = 0
@@ -216,8 +216,8 @@ if ckpt and ckpt.model_checkpoint_path:
     # if checkpoint exists, restore the parameters and set epoch_n and i_iter
     saver.restore(sess, ckpt.model_checkpoint_path)
     epoch_n = int(ckpt.model_checkpoint_path.split('-')[1])
-    i_iter = (epoch_n+1) * (num_examples/batch_size)
-    print "Restored Epoch ", epoch_n
+    i_iter = (epoch_n+1) * int(num_examples/batch_size)
+    print("Restored Epoch ", epoch_n)
 else:
     # no checkpoint exists. create checkpoints directory if it does not exist.
     if not os.path.exists('checkpoints'):
@@ -225,28 +225,28 @@ else:
     init = tf.initialize_all_variables()
     sess.run(init)
 
-print "=== Training ==="
-print "Initial Accuracy: ", sess.run(accuracy, feed_dict={inputs: mnist.test.images, outputs: mnist.test.labels, training: False}), "%"
+print("=== Training ===")
+print("Initial Accuracy: ", sess.run(accuracy, feed_dict={inputs: mnist.test.images, outputs: mnist.test.labels, training: False}), "%")
 
 for i in tqdm(range(i_iter, num_iter)):
     images, labels = mnist.train.next_batch(batch_size)
     sess.run(train_step, feed_dict={inputs: images, outputs: labels, training: True})
-    if (i > 1) and ((i+1) % (num_iter/num_epochs) == 0):
-        epoch_n = i/(num_examples/batch_size)
+    if (i > 1) and ((i+1) % int(num_iter/num_epochs) == 0):
+        epoch_n = int(i/(num_examples/batch_size))
         if (epoch_n+1) >= decay_after:
             # decay learning rate
             # learning_rate = starter_learning_rate * ((num_epochs - epoch_n) / (num_epochs - decay_after))
             ratio = 1.0 * (num_epochs - (epoch_n+1))  # epoch_n + 1 because learning rate is set for next epoch
-            ratio = max(0, ratio / (num_epochs - decay_after))
+            ratio = max(0, int(ratio / (num_epochs - decay_after)))
             sess.run(learning_rate.assign(starter_learning_rate * ratio))
         saver.save(sess, 'checkpoints/model.ckpt', epoch_n)
-        # print "Epoch ", epoch_n, ", Accuracy: ", sess.run(accuracy, feed_dict={inputs: mnist.test.images, outputs:mnist.test.labels, training: False}), "%"
-        with open('train_log', 'ab') as train_log:
+        # print("Epoch ", epoch_n, ", Accuracy: ", sess.run(accuracy, feed_dict={inputs: mnist.test.images, outputs:mnist.test.labels, training: False}), "%")
+        with open('train_log', 'a') as train_log:
             # write test accuracy to file "train_log"
             train_log_w = csv.writer(train_log)
             log_i = [epoch_n] + sess.run([accuracy], feed_dict={inputs: mnist.test.images, outputs: mnist.test.labels, training: False})
             train_log_w.writerow(log_i)
 
-print "Final Accuracy: ", sess.run(accuracy, feed_dict={inputs: mnist.test.images, outputs: mnist.test.labels, training: False}), "%"
+print("Final Accuracy: ", sess.run(accuracy, feed_dict={inputs: mnist.test.images, outputs: mnist.test.labels, training: False}), "%")
 
 sess.close()
